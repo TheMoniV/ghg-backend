@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RequirementStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLIANT
+  MISSING_DOCUMENTS
+  NON_COMPLIANT
+}
+
+enum DocumentFileStatus {
+  NEW
+  IN_REVIEW
+  EXAMINED
+  SENT_TO_AUTHORITIES
+  VALIDATED
+}
+
+model Requirement {
+  id                String            @id @default(uuid())
+  name              String            @unique
+  description       String
+  status            RequirementStatus
+  documentsProvided DocumentFile[]
+
+  // housekeeping stuff
+  createdAt         DateTime                         @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime                         @updatedAt @db.Timestamp(6)
+  deletedAt         DateTime?                        @db.Timestamp(6)
+  documentsRequired RequiredDocumentsForCompliance[]
+
+  @@map("requirement")
+}
+
+model Document {
+  // Basic information about the document
+  id           String @id @default(uuid())
+  name         String
+  description  String
+  documentType String @map("document_type")
+
+  // Relationship to the requirement.
+  files DocumentFile[]
+
+  // housekeeping stuff
+  createdAt             DateTime                         @default(now()) @db.Timestamp(6)
+  updatedAt             DateTime                         @updatedAt @db.Timestamp(6)
+  deletedAt             DateTime?                        @db.Timestamp(6)
+  neededForRequirements RequiredDocumentsForCompliance[]
+
+  @@map("document")
+}
+
+model RequiredDocumentsForCompliance {
+  requirementId String      @map("requirement_id")
+  requirement   Requirement @relation(fields: [requirementId], references: [id])
+
+  documentId String   @map("document_id")
+  document   Document @relation(fields: [documentId], references: [id])
+
+  @@id([requirementId, documentId])
+  @@map("required_documents_for_compliance")
+}
+
+model DocumentFile {
+  id      String             @unique @default(uuid())
+  name    String             @unique // should be unique as per S3 requirement
+  version String
+  status  DocumentFileStatus @default(NEW)
+
+  // Metadata of the document instance
+  mimeType       String    @map("mime_type")
+  tags           String[]
+  expirationDate DateTime? @map("expiration_date") @db.Date
+
+  // We assume that the file will be stored in S3, we can extend this structre to support other storage types
+  // if needed
+  preSignedURL      String?   @map("presigned_url")
+  urlExpirationDate DateTime? @map("url_expiration_date") @db.Timestamp(6)
+
+  requirementId String      @map("requirement_id")
+  requirement   Requirement @relation(fields: [requirementId], references: [id])
+
+  documentId String   @map("document_id")
+  document   Document @relation(fields: [documentId], references: [id])
+
+  // housekeeping stuff
+  createdAt DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt DateTime  @updatedAt @db.Timestamp(6)
+  deletedAt DateTime? @db.Timestamp(6)
+
+  @@id([id, requirementId, documentId])
+  @@map("document_file")
+}

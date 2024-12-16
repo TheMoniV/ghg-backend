@@ -1,0 +1,12 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    volumes:
+      - ./pg-init-scripts:/docker-entrypoint-initdb.d
+    environment:
+      - POSTGRES_USER=hammadi
+      - POSTGRES_PASSWORD=hammadi2024
+      - POSTGRES_MULTIPLE_DATABASES=main
